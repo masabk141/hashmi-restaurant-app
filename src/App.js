@@ -11,10 +11,68 @@ const EXPENSE_CATEGORIES = [
 const CUSTOMER_CATEGORIES = [
   'Dine-In','Takeaway','Catering Order','Home Delivery','Event Booking','Advance Booking','Other'
 ];
+
+// Chart of Accounts (Double-Entry Bookkeeping System)
+const CHART_OF_ACCOUNTS = {
+  // ASSETS
+  '1010': { code:'1010', name:'Cash in Hand', type:'Asset', category:'Current Asset', active:true },
+  '1020': { code:'1020', name:'Bank Account', type:'Asset', category:'Current Asset', active:true },
+  '1030': { code:'1030', name:'Inventory - Meat', type:'Asset', category:'Current Asset', active:true },
+  '1031': { code:'1031', name:'Inventory - Vegetables', type:'Asset', category:'Current Asset', active:true },
+  '1032': { code:'1032', name:'Inventory - Beverages', type:'Asset', category:'Current Asset', active:true },
+  '1033': { code:'1033', name:'Inventory - Other', type:'Asset', category:'Current Asset', active:true },
+  '1040': { code:'1040', name:'Equipment', type:'Asset', category:'Fixed Asset', active:true },
+  
+  // LIABILITIES
+  '2010': { code:'2010', name:'Accounts Payable', type:'Liability', category:'Current Liability', active:true },
+  '2020': { code:'2020', name:'Short Term Loan', type:'Liability', category:'Current Liability', active:true },
+  '2030': { code:'2030', name:'Long Term Loan', type:'Liability', category:'Long Term Liability', active:true },
+  
+  // EQUITY
+  '3010': { code:'3010', name:'Capital Account', type:'Equity', category:'Owner Equity', active:true },
+  '3020': { code:'3020', name:'Retained Earnings', type:'Equity', category:'Owner Equity', active:true },
+  
+  // REVENUE
+  '4010': { code:'4010', name:'Dine-In Revenue', type:'Revenue', category:'Food & Beverage', active:true },
+  '4020': { code:'4020', name:'Takeaway Revenue', type:'Revenue', category:'Food & Beverage', active:true },
+  '4030': { code:'4030', name:'Catering Revenue', type:'Revenue', category:'Food & Beverage', active:true },
+  '4040': { code:'4040', name:'Beverage Sales', type:'Revenue', category:'Food & Beverage', active:true },
+  '4050': { code:'4050', name:'Delivery Revenue', type:'Revenue', category:'Food & Beverage', active:true },
+  
+  // EXPENSES
+  '5010': { code:'5010', name:'Cost of Meat', type:'Expense', category:'COGS', active:true },
+  '5020': { code:'5020', name:'Cost of Vegetables', type:'Expense', category:'COGS', active:true },
+  '5030': { code:'5030', name:'Cost of Beverages', type:'Expense', category:'COGS', active:true },
+  '5040': { code:'5040', name:'Cost of Rice & Grain', type:'Expense', category:'COGS', active:true },
+  '5050': { code:'5050', name:'Cooking Oil & Condiments', type:'Expense', category:'COGS', active:true },
+  '6010': { code:'6010', name:'Electricity', type:'Expense', category:'Operating', active:true },
+  '6020': { code:'6020', name:'Gas', type:'Expense', category:'Operating', active:true },
+  '6030': { code:'6030', name:'Equipment Repair', type:'Expense', category:'Operating', active:true },
+  '6040': { code:'6040', name:'Staff Wages', type:'Expense', category:'Payroll', active:true },
+  '6050': { code:'6050', name:'Cleaning & Supplies', type:'Expense', category:'Operating', active:true },
+  '6060': { code:'6060', name:'Packaging', type:'Expense', category:'Operating', active:true },
+  '6070': { code:'6070', name:'Other Operating Expenses', type:'Expense', category:'Operating', active:true },
+};
+
 const DEFAULT_OWNERS = [
   { id:'owner1', name:'Owner 1', email:'owner1@hashmi.com', password:'hashmi123', role:'owner' },
   { id:'owner2', name:'Owner 2', email:'owner2@hashmi.com', password:'hashmi123', role:'owner' },
   { id:'owner3', name:'Owner 3', email:'owner3@hashmi.com', password:'hashmi123', role:'owner' },
+];
+
+// Seed GL Entries (with Chart of Accounts)
+const SEED_GL_ENTRIES = [
+  { id:1, date:'2026-04-10', debitCode:'1010', creditCode:'4010', amount:18500, description:'Dine-In Cash Receipt', refTxId:null },
+  { id:2, date:'2026-04-11', debitCode:'5010', creditCode:'2010', amount:7200, description:'Meat Purchase - Payable', refTxId:null },
+  { id:3, date:'2026-04-12', debitCode:'1020', creditCode:'4040', amount:5000, description:'Beverage Sales - Bank Deposit', refTxId:null },
+];
+
+// Seed Beverages
+const SEED_BEVERAGES = [
+  { id:'bev1', name:'Mango Lassi', costPerUnit:150, quantity:50, unit:'Glass', reorderLevel:20 },
+  { id:'bev2', name:'Lemonade', costPerUnit:100, quantity:100, unit:'Glass', reorderLevel:30 },
+  { id:'bev3', name:'Buttermilk', costPerUnit:80, quantity:75, unit:'Glass', reorderLevel:25 },
+  { id:'bev4', name:'Tea / Coffee', costPerUnit:120, quantity:40, unit:'Cup', reorderLevel:15 },
 ];
 const SEED_TRANSACTIONS = [
   { id:1, date:'2026-04-10', section:'expense',  party:'Al-Hamza Meats',    category:'Meat / Butcher',      amount:18500, status:'Paid',   notes:'Weekly supply', createdBy:'Owner 1' },
@@ -31,8 +89,10 @@ const NAV_ITEMS = [
   { id:'dashboard', label:'Dashboard',              icon:'▦' },
   { id:'expenses',  label:'Restaurant Expenses',    icon:'↑' },
   { id:'customers', label:'Customer Transactions',  icon:'↓' },
+  { id:'beverages', label:'Beverage Management',    icon:'🍹' },
   { id:'history',   label:'Full History',           icon:'☰' },
   { id:'reports',   label:'Reports',                icon:'◈' },
+  { id:'ledger',    label:'General Ledger',         icon:'📖' },
 ];
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -91,12 +151,17 @@ function downloadReportCSV(transactions) {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [transactions, setTransactions] = useState(()=>loadLS('hm_txns_v3', SEED_TRANSACTIONS));
+  const [glEntries,    setGlEntries]    = useState(()=>loadLS('hm_gl_v3', SEED_GL_ENTRIES));
+  const [beverages,    setBeverages]    = useState(()=>loadLS('hm_beverages_v3', SEED_BEVERAGES));
   const [users,        setUsers]        = useState(()=>loadLS('hm_users_v3', DEFAULT_OWNERS));
   const [loginLogs,    setLoginLogs]    = useState(()=>loadLS('hm_logs_v3',  []));
   const [page,         setPage]         = useState('dashboard');
   const [toast,        setToast]        = useState({msg:'',ok:true,show:false});
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(()=>{ saveLS('hm_txns_v3',  transactions); },[transactions]);
+  useEffect(()=>{ saveLS('hm_gl_v3',    glEntries);    },[glEntries]);
+  useEffect(()=>{ saveLS('hm_beverages_v3', beverages); },[beverages]);
   useEffect(()=>{ saveLS('hm_users_v3', users);        },[users]);
   useEffect(()=>{ saveLS('hm_logs_v3',  loginLogs);    },[loginLogs]);
 
@@ -157,27 +222,28 @@ export default function App() {
   return (
     <div className="shell">
       {/* ── SIDEBAR ── */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`}>
         <div className="sidebar-logo">
           <img src={logo} alt="Hashmi Platter House" className="sidebar-logo-img"/>
           <div className="sidebar-logo-text">
             <span className="slt-name">Hashmi</span>
             <span className="slt-sub">Platter House</span>
           </div>
+          <button className="mobile-close" onClick={() => setShowMobileMenu(false)}>✕</button>
         </div>
 
         <nav className="sidebar-nav">
           <div className="snav-label">MAIN MENU</div>
           {allNavItems.slice(0,3).map(n=>(
-            <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}>
+            <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>{setPage(n.id); setShowMobileMenu(false);}}>
               <span className="snav-icon">{n.icon}</span>
               <span className="snav-label-text">{n.label}</span>
               {page===n.id && <span className="snav-active-bar"/>}
             </button>
           ))}
           <div className="snav-label" style={{marginTop:20}}>RECORDS</div>
-          {allNavItems.slice(3,5).map(n=>(
-            <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}>
+          {allNavItems.slice(3,7).map(n=>(
+            <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>{setPage(n.id); setShowMobileMenu(false);}}>
               <span className="snav-icon">{n.icon}</span>
               <span className="snav-label-text">{n.label}</span>
               {page===n.id && <span className="snav-active-bar"/>}
@@ -185,7 +251,7 @@ export default function App() {
           ))}
           {isOwner && <>
             <div className="snav-label" style={{marginTop:20}}>ADMIN</div>
-            <button className={`snav-item ${page==='settings'?'active':''}`} onClick={()=>setPage('settings')}>
+            <button className={`snav-item ${page==='settings'?'active':''}`} onClick={()=>{setPage('settings'); setShowMobileMenu(false);}} >
               <span className="snav-icon">⚙</span>
               <span className="snav-label-text">Settings</span>
               {page==='settings' && <span className="snav-active-bar"/>}
@@ -195,7 +261,7 @@ export default function App() {
 
         <div className="sidebar-footer">
           <span className={`sf-role ${currentUser.role}`}>{currentUser.role.toUpperCase()}</span>
-          <span className="sf-version">v2.0</span>
+          <span className="sf-version">v3.0 Pro</span>
         </div>
       </aside>
 
@@ -204,6 +270,7 @@ export default function App() {
         {/* TOPBAR */}
         <header className="topbar">
           <div className="topbar-left">
+            <button className="mobile-menu-btn" onClick={() => setShowMobileMenu(!showMobileMenu)}>☰</button>
             <div className="topbar-page">{allNavItems.find(n=>n.id===page)?.label || 'Dashboard'}</div>
             <div className="topbar-date">{new Date().toLocaleDateString('en-PK',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
           </div>
@@ -214,15 +281,18 @@ export default function App() {
 
         {/* PAGE CONTENT */}
         <main className="page-content">
-          {page==='dashboard' && <DashboardPage transactions={transactions} currentUser={currentUser} setPage={setPage} markPaid={markPaid}/>}
+          {page==='dashboard' && <DashboardPage transactions={transactions} glEntries={glEntries} beverages={beverages} currentUser={currentUser} setPage={setPage} markPaid={markPaid}/>}
           {page==='expenses'  && <ExpensesPage  transactions={transactions} addTransaction={addTransaction} markPaid={markPaid} deleteTransaction={deleteTransaction} currentUser={currentUser}/>}
           {page==='customers' && <CustomersPage transactions={transactions} addTransaction={addTransaction} markPaid={markPaid} deleteTransaction={deleteTransaction} currentUser={currentUser}/>}
+          {page==='beverages' && <BeveragesPage beverages={beverages} setBeverages={setBeverages} addTransaction={addTransaction} glEntries={glEntries} setGlEntries={setGlEntries} currentUser={currentUser}/>}
           {page==='history'   && <HistoryPage   transactions={transactions} markPaid={markPaid} deleteTransaction={deleteTransaction} clearHistory={clearHistory} currentUser={currentUser}/>}
-          {page==='reports'   && <ReportsPage   transactions={transactions}/>}
+          {page==='reports'   && <ReportsPage   transactions={transactions} beverages={beverages}/>}
+          {page==='ledger'    && <LedgerPage    glEntries={glEntries} chartOfAccounts={CHART_OF_ACCOUNTS}/>}
           {page==='settings'  && isOwner && <SettingsPage users={users} loginLogs={loginLogs} addManager={addManager} removeManager={removeManager} currentUser={currentUser}/>}
         </main>
       </div>
 
+      {showMobileMenu && <div className="overlay" onClick={() => setShowMobileMenu(false)}/>}
       {toast.show && <div className={`toast ${toast.ok?'tok':'terr'}`}>{toast.msg}</div>}
     </div>
   );
@@ -323,7 +393,7 @@ function LoginPage({ onLogin, toast }) {
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardPage({ transactions, currentUser, setPage, markPaid }) {
+function DashboardPage({ transactions, glEntries, beverages, currentUser, setPage, markPaid }) {
   const expTx      = transactions.filter(t=>t.section==='expense');
   const cusTx      = transactions.filter(t=>t.section==='customer');
   const totalExp   = expTx.reduce((s,t)=>s+t.amount,0);
@@ -333,7 +403,11 @@ function DashboardPage({ transactions, currentUser, setPage, markPaid }) {
   const net        = totalCus - totalExp;
   const paidCount  = transactions.filter(t=>t.status==='Paid').length;
   const totalCount = transactions.length;
-
+  
+  // Beverage Stats
+  const beverageInventoryValue = beverages.reduce((s,b)=>s+(b.quantity*b.costPerUnit),0);
+  const lowStockBeverages = beverages.filter(b=>b.quantity <= b.reorderLevel).length;
+  
   const catMap={};
   expTx.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const topCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -355,6 +429,8 @@ function DashboardPage({ transactions, currentUser, setPage, markPaid }) {
         <KpiCard label="Total Expenses" value={fmt(totalExp)}   delta={`${expTx.length} entries`}   color="red"    icon={<IconExpense/>}/>
         <KpiCard label="Unpaid Balance" value={fmt(totalUnpaid)} delta={`${unpaidCount} pending`}   color="yellow" icon={<IconPending/>}/>
         <KpiCard label="Net Profit" value={fmt(net)}             delta={net>=0?'Profit':'Loss'}      color={net>=0?'green':'red'} icon={<IconNet/>}/>
+        <KpiCard label="Beverage Inventory" value={fmt(beverageInventoryValue)} delta={`${lowStockBeverages} low stock`} color="orange" icon={<IconBeverage/>}/>
+        <KpiCard label="GL Entries" value={glEntries.length} delta={`Debits & Credits`} color="blue" icon={<IconLedger/>}/>
       </div>
 
       {/* Middle Row */}
@@ -477,6 +553,8 @@ const IconRevenue = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="no
 const IconExpense = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 10h14M10 3v14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 const IconPending = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 const IconNet     = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14l4-4 3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const IconBeverage = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 2h8v4c0 2.21-1.79 4-4 4s-4-1.79-4-4V2M4.5 6h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 6v8.5c0 1.93 1.57 3.5 3.5 3.5h1c1.93 0 3.5-1.57 3.5-3.5V6" stroke="currentColor" strokeWidth="1.5"/></svg>;
+const IconLedger = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/><path d="M4 8h12M4 12h12M8 4v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 
 // ══════════════════════════════════════════════════════════════════════════
 // EXPENSES PAGE
@@ -779,8 +857,223 @@ function SettingsPage({ users, loginLogs, addManager, removeManager, currentUser
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SHARED COMPONENTS
+// BEVERAGES PAGE
 // ══════════════════════════════════════════════════════════════════════════
+function BeveragesPage({ beverages, setBeverages, addTransaction, glEntries, setGlEntries, currentUser }) {
+  const [form, setForm] = useState({name:'',costPerUnit:'',quantity:'',unit:'Glass',reorderLevel:''});
+  const [err, setErr] = useState('');
+  const [saleForm, setSaleForm] = useState({beverageId:'',quantity:'',date:today(),pricePerUnit:''});
+
+  function handleAddBeverage() {
+    if (!form.name.trim()||!form.costPerUnit||!form.quantity||!form.reorderLevel) { setErr('All fields required'); return; }
+    const newBev = { id:'bev_'+Date.now(), name:form.name, costPerUnit:parseFloat(form.costPerUnit), quantity:parseInt(form.quantity), unit:form.unit, reorderLevel:parseInt(form.reorderLevel) };
+    setBeverages(prev=>[...prev,newBev]);
+    setForm({name:'',costPerUnit:'',quantity:'',unit:'Glass',reorderLevel:''});
+    setErr('');
+  }
+
+  function handleSaleBeverage() {
+    if (!saleForm.beverageId||!saleForm.quantity||!saleForm.pricePerUnit) { setErr('All fields required'); return; }
+    const bev = beverages.find(b=>b.id===saleForm.beverageId);
+    if (bev.quantity < parseInt(saleForm.quantity)) { setErr('Insufficient stock'); return; }
+    
+    const qty = parseInt(saleForm.quantity);
+    const totalAmount = qty * parseFloat(saleForm.pricePerUnit);
+    
+    // Update inventory
+    setBeverages(prev=>prev.map(b=>b.id===saleForm.beverageId?{...b,quantity:b.quantity-qty}:b));
+    
+    // Add GL entries (debit cash, credit beverage revenue)
+    setGlEntries(prev=>[...prev,{id:Date.now(), date:saleForm.date, debitCode:'1020', creditCode:'4040', amount:totalAmount, description:`Beverage Sale - ${bev.name}`, refTxId:null}]);
+    
+    setSaleForm({beverageId:'',quantity:'',date:today(),pricePerUnit:''});
+    setErr('');
+  }
+
+  const totalInventoryValue = beverages.reduce((s,b)=>s+(b.quantity*b.costPerUnit),0);
+  const lowStockCount = beverages.filter(b=>b.quantity <= b.reorderLevel).length;
+
+  return (
+    <div className="page-wrap">
+      <PageHeader title="Beverage Management" action={<span className="badge">{beverages.length} Items</span>}/>
+      <div className="stat-row">
+        <StatPill label="Inventory Value" val={fmt(totalInventoryValue)} color="orange"/>
+        <StatPill label="Low Stock Items" val={lowStockCount} color="red"/>
+        <StatPill label="Total Units" val={beverages.reduce((s,b)=>s+b.quantity,0)} color="blue"/>
+      </div>
+      
+      <div className="split-layout">
+        <div>
+          <FormCard title="Add New Beverage" onSubmit={handleAddBeverage} submitLabel="+ Add Beverage" submitColor="orange">
+            <Field label="Beverage Name *" error={err&&!form.name.trim()}>
+              <input type="text" placeholder="e.g. Mango Lassi" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+            </Field>
+            <TwoCol>
+              <Field label="Cost per Unit (PKR) *" error={err&&!form.costPerUnit}>
+                <input type="number" placeholder="0" min="0" value={form.costPerUnit} onChange={e=>setForm({...form,costPerUnit:e.target.value})}/>
+              </Field>
+              <Field label="Unit *">
+                <select value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})}>
+                  <option>Glass</option><option>Cup</option><option>Bottle</option><option>Liter</option>
+                </select>
+              </Field>
+            </TwoCol>
+            <TwoCol>
+              <Field label="Opening Quantity *" error={err&&!form.quantity}>
+                <input type="number" placeholder="0" min="0" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})}/>
+              </Field>
+              <Field label="Reorder Level *" error={err&&!form.reorderLevel}>
+                <input type="number" placeholder="0" min="0" value={form.reorderLevel} onChange={e=>setForm({...form,reorderLevel:e.target.value})}/>
+              </Field>
+            </TwoCol>
+            {err && <div className="err-alert">{err}</div>}
+          </FormCard>
+
+          <FormCard title="Record Beverage Sale" onSubmit={handleSaleBeverage} submitLabel="+ Record Sale" submitColor="green" style={{marginTop:16}}>
+            <Field label="Select Beverage *">
+              <select value={saleForm.beverageId} onChange={e=>setSaleForm({...saleForm,beverageId:e.target.value})}>
+                <option value="">-- Select --</option>
+                {beverages.map(b=><option key={b.id} value={b.id}>{b.name} ({b.quantity} remaining)</option>)}
+              </select>
+            </Field>
+            <TwoCol>
+              <Field label="Quantity Sold *">
+                <input type="number" placeholder="0" min="0" value={saleForm.quantity} onChange={e=>setSaleForm({...saleForm,quantity:e.target.value})}/>
+              </Field>
+              <Field label="Sale Price per Unit (PKR) *">
+                <input type="number" placeholder="0" min="0" value={saleForm.pricePerUnit} onChange={e=>setSaleForm({...saleForm,pricePerUnit:e.target.value})}/>
+              </Field>
+            </TwoCol>
+            <Field label="Date *">
+              <input type="date" value={saleForm.date} onChange={e=>setSaleForm({...saleForm,date:e.target.value})}/>
+            </Field>
+            {err && <div className="err-alert">{err}</div>}
+          </FormCard>
+        </div>
+
+        <div className="list-card">
+          <div className="lc-hdr"><span>Beverage Inventory</span></div>
+          {beverages.length===0 && <div className="empty-state"><p>No beverages added yet.</p></div>}
+          {beverages.map(b=>(
+            <div className="bev-row" key={b.id}>
+              <div className="bev-main">
+                <div className="bev-name">{b.name}</div>
+                <div className="bev-meta">Cost: {fmt(b.costPerUnit)} | Unit: {b.unit}</div>
+              </div>
+              <div className="bev-qty">
+                <div className={`stock-badge ${b.quantity <= b.reorderLevel ? 'low' : 'ok'}`}>{b.quantity} {b.unit}s</div>
+                <div className="stock-status">Reorder at: {b.reorderLevel}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GENERAL LEDGER PAGE
+// ══════════════════════════════════════════════════════════════════════════
+function LedgerPage({ glEntries, chartOfAccounts }) {
+  const [selectedAcct, setSelectedAcct] = useState(null);
+  
+  // Calculate account balances
+  function getAccountBalance(code) {
+    const isDebitAcc = ['1','3','5'].includes(code[0]); // Assets, Equity (contra), Expenses are Debit balances
+    const debits = glEntries.filter(e=>e.debitCode===code).reduce((s,e)=>s+e.amount,0);
+    const credits = glEntries.filter(e=>e.creditCode===code).reduce((s,e)=>s+e.amount,0);
+    return isDebitAcc ? (debits - credits) : (credits - debits);
+  }
+
+  const accountGroups = {};
+  Object.values(chartOfAccounts).forEach(acc=>{
+    if (!accountGroups[acc.type]) accountGroups[acc.type] = [];
+    accountGroups[acc.type].push(acc);
+  });
+
+  return (
+    <div className="page-wrap">
+      <PageHeader title="General Ledger (Double-Entry Bookkeeping)" action={<span className="badge">{glEntries.length} Entries</span>}/>
+      
+      <div className="gl-container">
+        <div className="gl-accounts">
+          <div className="gl-section-title">Chart of Accounts</div>
+          {Object.entries(accountGroups).map(([type,accts])=>(
+            <div key={type} className="gl-type-group">
+              <div className="gl-type-label">{type.toUpperCase()}S</div>
+              {accts.map(acc=>(
+                <button key={acc.code} className={`gl-acc-btn ${selectedAcct===acc.code?'active':''}`} onClick={()=>setSelectedAcct(acc.code)}>
+                  <span className="gl-code">{acc.code}</span>
+                  <span className="gl-accname">{acc.name}</span>
+                  <span className="gl-bal">{fmt(getAccountBalance(acc.code))}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div className="gl-entries">
+          {selectedAcct ? (
+            <>
+              <div className="gle-header">
+                <div>{chartOfAccounts[selectedAcct]?.code} - {chartOfAccounts[selectedAcct]?.name}</div>
+                <div className="gle-balance">Balance: {fmt(getAccountBalance(selectedAcct))}</div>
+              </div>
+              <div className="gle-table">
+                <div className="gle-row gle-header-row">
+                  <div>Date</div>
+                  <div>Debit</div>
+                  <div>Credit</div>
+                  <div>Description</div>
+                </div>
+                {glEntries.filter(e=>e.debitCode===selectedAcct||e.creditCode===selectedAcct).map(e=>(
+                  <div className="gle-row" key={e.id}>
+                    <div>{e.date}</div>
+                    <div>{e.debitCode===selectedAcct?fmt(e.amount):'-'}</div>
+                    <div>{e.creditCode===selectedAcct?fmt(e.amount):'-'}</div>
+                    <div className="gle-desc">{e.description}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state" style={{padding:'60px 24px'}}><p>Select an account to view entries</p></div>
+          )}
+        </div>
+      </div>
+
+      {/* Trial Balance */}
+      <div className="dash-card" style={{marginTop:24}}>
+        <div className="dc-header"><span className="dc-title">Trial Balance</span></div>
+        <div className="trial-balance-table">
+          <div className="tbl-header">
+            <div>Account</div>
+            <div>Code</div>
+            <div>Debit Balance</div>
+            <div>Credit Balance</div>
+          </div>
+          {Object.values(chartOfAccounts).map(acc=>{
+            const balance = getAccountBalance(acc.code);
+            const isDebitBal = ['1','3','5'].includes(acc.code[0]);
+            const debitBal = balance >= 0 && isDebitBal ? balance : 0;
+            const creditBal = balance >= 0 && !isDebitBal ? balance : Math.abs(balance);
+            return balance !== 0 && (
+              <div className="tbl-row" key={acc.code}>
+                <div>{acc.name}</div>
+                <div>{acc.code}</div>
+                <div>{fmt(debitBal)}</div>
+                <div>{fmt(creditBal)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function PageHeader({ title, action }) {
   return (
     <div className="page-header">
