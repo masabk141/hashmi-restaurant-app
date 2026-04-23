@@ -153,15 +153,18 @@ export default function App() {
   const [transactions, setTransactions] = useState(()=>loadLS('hm_txns_v3', SEED_TRANSACTIONS));
   const [glEntries,    setGlEntries]    = useState(()=>loadLS('hm_gl_v3', SEED_GL_ENTRIES));
   const [beverages,    setBeverages]    = useState(()=>loadLS('hm_beverages_v3', SEED_BEVERAGES));
+  const [inventory,    setInventory]    = useState(()=>loadLS('hm_inventory_v3', []));
   const [users,        setUsers]        = useState(()=>loadLS('hm_users_v3', DEFAULT_OWNERS));
   const [loginLogs,    setLoginLogs]    = useState(()=>loadLS('hm_logs_v3',  []));
   const [page,         setPage]         = useState('dashboard');
   const [toast,        setToast]        = useState({msg:'',ok:true,show:false});
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showInventoryForm, setShowInventoryForm] = useState(false);
 
   useEffect(()=>{ saveLS('hm_txns_v3',  transactions); },[transactions]);
   useEffect(()=>{ saveLS('hm_gl_v3',    glEntries);    },[glEntries]);
   useEffect(()=>{ saveLS('hm_beverages_v3', beverages); },[beverages]);
+  useEffect(()=>{ saveLS('hm_inventory_v3', inventory); },[inventory]);
   useEffect(()=>{ saveLS('hm_users_v3', users);        },[users]);
   useEffect(()=>{ saveLS('hm_logs_v3',  loginLogs);    },[loginLogs]);
 
@@ -281,7 +284,8 @@ export default function App() {
 
         {/* PAGE CONTENT */}
         <main className="page-content">
-          {page==='dashboard' && <DashboardPage transactions={transactions} glEntries={glEntries} beverages={beverages} currentUser={currentUser} setPage={setPage} markPaid={markPaid}/>}
+          {page==='dashboard' && <DashboardPage transactions={transactions} glEntries={glEntries} beverages={beverages} inventory={inventory} setInventory={setInventory} currentUser={currentUser} setPage={setPage} markPaid={markPaid}/>}
+          {page==='inventory' && <InventoryManagementPage inventory={inventory} setInventory={setInventory} beverages={beverages} setBeverages={setBeverages} currentUser={currentUser}/>}
           {page==='expenses'  && <ExpensesPage  transactions={transactions} addTransaction={addTransaction} markPaid={markPaid} deleteTransaction={deleteTransaction} currentUser={currentUser}/>}
           {page==='customers' && <CustomersPage transactions={transactions} addTransaction={addTransaction} markPaid={markPaid} deleteTransaction={deleteTransaction} currentUser={currentUser}/>}
           {page==='beverages' && <BeveragesPage beverages={beverages} setBeverages={setBeverages} addTransaction={addTransaction} glEntries={glEntries} setGlEntries={setGlEntries} currentUser={currentUser}/>}
@@ -353,18 +357,31 @@ function LoginPage({ onLogin, toast }) {
   const [email, setEmail]     = useState('');
   const [pass,  setPass]      = useState('');
   const [show,  setShow]      = useState(false);
+  const [videoIndex, setVideoIndex] = useState(0);
+  const videos = [require('./1.mp4'), require('./2.mp4'), require('./3.mp4'), require('./4.mp4')];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVideoIndex(prev => (prev + 1) % videos.length);
+    }, 8000); // Change video every 8 seconds
+    return () => clearInterval(interval);
+  }, [videos.length]);
 
   return (
     <div className="login-page">
       <div className="login-left">
-        <img src={logo} alt="Hashmi Platter House" className="login-logo-img"/>
-        <div className="login-tagline">Restaurant Management System</div>
-        <div className="login-tagline-sub">Manage your finances, track expenses,<br/>and grow your business.</div>
+        <video key={videoIndex} className="login-video" autoPlay muted loop>
+          <source src={videos[videoIndex]} type="video/mp4" />
+        </video>
+        <div className="login-overlay"/>
       </div>
       <div className="login-right">
         <div className="login-card">
-          <div className="lc-title">Sign In</div>
-          <div className="lc-sub">Enter your credentials to continue</div>
+          <div className="login-header-logo">
+            <img src={logo} alt="Hashmi Platter House" className="login-logo-lg"/>
+          </div>
+          <div className="login-form-title">Sign In</div>
+          <div className="login-form-sub">Enter your credentials to continue</div>
           <div className="field" style={{marginBottom:14}}>
             <label>Email Address</label>
             <input type="email" placeholder="your@email.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&onLogin(email,pass)}/>
@@ -377,12 +394,6 @@ function LoginPage({ onLogin, toast }) {
             </div>
           </div>
           <button className="login-btn" onClick={()=>onLogin(email,pass)}>Sign In →</button>
-          <div className="login-hint">
-            <strong>Default logins:</strong><br/>
-            owner1@hashmi.com · hashmi123<br/>
-            owner2@hashmi.com · hashmi123<br/>
-            owner3@hashmi.com · hashmi123
-          </div>
         </div>
       </div>
       {toast.show && <div className={`toast ${toast.ok?'tok':'terr'}`}>{toast.msg}</div>}
@@ -393,7 +404,7 @@ function LoginPage({ onLogin, toast }) {
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardPage({ transactions, glEntries, beverages, currentUser, setPage, markPaid }) {
+function DashboardPage({ transactions, glEntries, beverages, inventory, setInventory, currentUser, setPage, markPaid }) {
   const expTx      = transactions.filter(t=>t.section==='expense');
   const cusTx      = transactions.filter(t=>t.section==='customer');
   const totalExp   = expTx.reduce((s,t)=>s+t.amount,0);
@@ -413,6 +424,17 @@ function DashboardPage({ transactions, glEntries, beverages, currentUser, setPag
   const topCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const recentUnpaid = transactions.filter(t=>t.status==='Unpaid').slice(0,4);
 
+  // Total Liabilities
+  const liabilityCodes = Object.keys(CHART_OF_ACCOUNTS).filter(code => CHART_OF_ACCOUNTS[code].type === 'Liability');
+  let totalLiabilities = 0;
+  glEntries.forEach(entry => {
+    if (liabilityCodes.includes(entry.creditCode)) totalLiabilities += entry.amount;
+    if (liabilityCodes.includes(entry.debitCode)) totalLiabilities -= entry.amount;
+  });
+
+  // Total Inventory Value
+  const inventoryValue = inventory.reduce((s, item) => s + (item.quantity * item.costPerUnit), 0) + beverageInventoryValue;
+
   return (
     <div className="page-wrap">
       {/* Greeting */}
@@ -429,11 +451,22 @@ function DashboardPage({ transactions, glEntries, beverages, currentUser, setPag
         <KpiCard label="Total Expenses" value={fmt(totalExp)}   delta={`${expTx.length} entries`}   color="red"    icon={<IconExpense/>}/>
         <KpiCard label="Unpaid Balance" value={fmt(totalUnpaid)} delta={`${unpaidCount} pending`}   color="yellow" icon={<IconPending/>}/>
         <KpiCard label="Net Profit" value={fmt(net)}             delta={net>=0?'Profit':'Loss'}      color={net>=0?'green':'red'} icon={<IconNet/>}/>
-        <KpiCard label="Beverage Inventory" value={fmt(beverageInventoryValue)} delta={`${lowStockBeverages} low stock`} color="orange" icon={<IconBeverage/>}/>
-        <KpiCard label="GL Entries" value={glEntries.length} delta={`Debits & Credits`} color="blue" icon={<IconLedger/>}/>
+        <KpiCard label="Total Inventory" value={fmt(inventoryValue)} delta={`${inventory.length + beverages.length} items`} color="orange" icon={<IconBeverage/>}/>
+        <KpiCard label="Total Liabilities" value={fmt(totalLiabilities)} delta={`Liability accounts`} color="purple" icon={<IconLedger/>}/>
       </div>
 
-      {/* Middle Row */}
+      {/* Quick Actions - MOVED UP */}
+      <div className="dash-card qa-card">
+        <div className="dc-header"><span className="dc-title">⚡ Quick Actions</span></div>
+        <div className="qa-grid">
+          <button className="qa-btn red"    onClick={()=>setPage('expenses')}>+ Add Expense</button>
+          <button className="qa-btn green"  onClick={()=>setPage('customers')}>+ Add Customer</button>
+          <button className="qa-btn blue" onClick={()=>setPage('inventory')}>📦 Manage Inventory</button>
+          <button className="qa-btn orange" onClick={()=>setPage('reports')}>📊 Download Reports</button>
+        </div>
+      </div>
+
+      {/* Middle Row - Pending & Categories */}
       <div className="dash-mid">
         {/* Unpaid Items */}
         <div className="dash-card" style={{flex:1.2}}>
@@ -503,17 +536,6 @@ function DashboardPage({ transactions, glEntries, beverages, currentUser, setPag
         <div className="dash-stat-card">
           <div className="dsc-val green">{cusTx.length}</div>
           <div className="dsc-label">Customer Entries</div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="dash-card">
-        <div className="dc-header"><span className="dc-title">Quick Actions</span></div>
-        <div className="qa-grid">
-          <button className="qa-btn red"    onClick={()=>setPage('expenses')}>+ Add Expense</button>
-          <button className="qa-btn green"  onClick={()=>setPage('customers')}>+ Add Customer</button>
-          <button className="qa-btn neutral" onClick={()=>setPage('history')}>View Full History</button>
-          <button className="qa-btn yellow" onClick={()=>setPage('reports')}>Download Reports</button>
         </div>
       </div>
 
@@ -850,6 +872,423 @@ function SettingsPage({ users, loginLogs, addManager, removeManager, currentUser
               <div className="device-time">{log.time}</div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INVENTORY MANAGEMENT PAGE (Professional)
+// ══════════════════════════════════════════════════════════════════════════
+function InventoryManagementPage({ inventory, setInventory, beverages, setBeverages, currentUser }) {
+  const [tab, setTab] = useState('general');
+  const [newItem, setNewItem] = useState({ name: '', quantity: '', costPerUnit: '', unit: 'kg', category: 'Meat' });
+  const [newBev, setNewBev] = useState({ name: '', costPerUnit: '', quantity: '', unit: 'Glass', reorderLevel: '' });
+  const [err, setErr] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  function addGeneralInventory() {
+    if (!newItem.name.trim() || !newItem.quantity || !newItem.costPerUnit) { 
+      setErr('All fields required'); 
+      return; 
+    }
+    const qty = parseFloat(newItem.quantity);
+    const cost = parseFloat(newItem.costPerUnit);
+    if (qty <= 0 || cost <= 0) { setErr('Quantity and cost must be greater than 0'); return; }
+    
+    setInventory(prev => [...prev, { 
+      ...newItem, 
+      id: Date.now(), 
+      quantity: qty, 
+      costPerUnit: cost,
+      createdDate: new Date().toISOString().split('T')[0],
+      lastUpdated: new Date().toISOString().split('T')[0]
+    }]);
+    setNewItem({ name: '', quantity: '', costPerUnit: '', unit: 'kg', category: 'Meat' });
+    setErr('');
+  }
+
+  function addBeverageInventory() {
+    if (!newBev.name.trim() || !newBev.costPerUnit || !newBev.quantity || !newBev.reorderLevel) {
+      setErr('All fields required');
+      return;
+    }
+    const qty = parseInt(newBev.quantity);
+    const cost = parseFloat(newBev.costPerUnit);
+    const reorder = parseInt(newBev.reorderLevel);
+    if (qty <= 0 || cost <= 0 || reorder < 0) { setErr('Invalid quantity or cost'); return; }
+    
+    setBeverages(prev => [...prev, {
+      id: 'bev_' + Date.now(),
+      name: newBev.name,
+      costPerUnit: cost,
+      quantity: qty,
+      unit: newBev.unit,
+      reorderLevel: reorder,
+      createdDate: new Date().toISOString().split('T')[0]
+    }]);
+    setNewBev({ name: '', costPerUnit: '', quantity: '', unit: 'Glass', reorderLevel: '' });
+    setErr('');
+  }
+
+  function deleteInventoryItem(id) {
+    if (!window.confirm('Delete this item permanently?')) return;
+    setInventory(prev => prev.filter(i => i.id !== id));
+  }
+
+  function deleteBeverageItem(id) {
+    if (!window.confirm('Delete this beverage permanently?')) return;
+    setBeverages(prev => prev.filter(b => b.id !== id));
+  }
+
+  function updateItemQuantity(id, newQty) {
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, quantity: parseFloat(newQty), lastUpdated: new Date().toISOString().split('T')[0] } : i));
+  }
+
+  function updateBevQuantity(id, newQty) {
+    setBeverages(prev => prev.map(b => b.id === id ? { ...b, quantity: parseInt(newQty) } : b));
+  }
+
+  // Filter items
+  const filteredInventory = inventory.filter(i => 
+    i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    i.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredBeverages = beverages.filter(b => 
+    b.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Calculate totals
+  const generalValue = inventory.reduce((s, i) => s + (i.quantity * i.costPerUnit), 0);
+  const beverageValue = beverages.reduce((s, b) => s + (b.quantity * b.costPerUnit), 0);
+  const totalValue = generalValue + beverageValue;
+  const lowStockItems = inventory.filter(i => i.quantity <= 5).length;
+  const lowStockBevs = beverages.filter(b => b.quantity <= b.reorderLevel).length;
+
+  return (
+    <div className="page-wrap">
+      <PageHeader 
+        title="📦 Inventory Management System" 
+        action={<span className="badge" style={{fontSize:12}}>{inventory.length + beverages.length} Total Items</span>}
+      />
+
+      {/* Stats Cards */}
+      <div className="inv-stats-row">
+        <div className="inv-stat-card gradient-green">
+          <div className="inv-stat-icon">💰</div>
+          <div className="inv-stat-content">
+            <div className="inv-stat-label">Total Inventory Value</div>
+            <div className="inv-stat-value">{fmt(totalValue)}</div>
+          </div>
+        </div>
+        <div className="inv-stat-card gradient-blue">
+          <div className="inv-stat-icon">📦</div>
+          <div className="inv-stat-content">
+            <div className="inv-stat-label">General Items</div>
+            <div className="inv-stat-value">{inventory.length}</div>
+          </div>
+        </div>
+        <div className="inv-stat-card gradient-orange">
+          <div className="inv-stat-icon">🍹</div>
+          <div className="inv-stat-content">
+            <div className="inv-stat-label">Beverages</div>
+            <div className="inv-stat-value">{beverages.length}</div>
+          </div>
+        </div>
+        <div className="inv-stat-card gradient-red">
+          <div className="inv-stat-icon">⚠️</div>
+          <div className="inv-stat-content">
+            <div className="inv-stat-label">Low Stock Items</div>
+            <div className="inv-stat-value">{lowStockItems + lowStockBevs}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="inv-tabs">
+        <button className={`inv-tab ${tab === 'general' ? 'active' : ''}`} onClick={() => { setTab('general'); setSearchTerm(''); }}>
+          📋 General Inventory ({inventory.length})
+        </button>
+        <button className={`inv-tab ${tab === 'beverages' ? 'active' : ''}`} onClick={() => { setTab('beverages'); setSearchTerm(''); }}>
+          🍹 Beverage Stock ({beverages.length})
+        </button>
+      </div>
+
+      {/* General Inventory Tab */}
+      {tab === 'general' && (
+        <div className="inv-split-layout">
+          <div className="inv-form-card">
+            <div className="inv-form-title">➕ Add New Item</div>
+            <div className="inv-form-content">
+              <div className="inv-field-group">
+                <label>Item Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g., Chicken Breast, Onion, Oil" 
+                  value={newItem.name} 
+                  onChange={e => setNewItem({...newItem, name: e.target.value})}
+                  className="inv-input"
+                />
+              </div>
+
+              <div className="inv-field-row">
+                <div className="inv-field-group">
+                  <label>Category *</label>
+                  <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="inv-input">
+                    <option>Meat</option>
+                    <option>Vegetables</option>
+                    <option>Spices</option>
+                    <option>Oil & Condiments</option>
+                    <option>Rice & Grains</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div className="inv-field-group">
+                  <label>Unit *</label>
+                  <select value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} className="inv-input">
+                    <option>kg</option>
+                    <option>liter</option>
+                    <option>pcs</option>
+                    <option>box</option>
+                    <option>pack</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="inv-field-row">
+                <div className="inv-field-group">
+                  <label>Quantity *</label>
+                  <input 
+                    type="number" 
+                    placeholder="0" 
+                    min="0" 
+                    step="0.01"
+                    value={newItem.quantity} 
+                    onChange={e => setNewItem({...newItem, quantity: e.target.value})}
+                    className="inv-input"
+                  />
+                </div>
+                <div className="inv-field-group">
+                  <label>Cost per Unit (PKR) *</label>
+                  <input 
+                    type="number" 
+                    placeholder="0" 
+                    min="0" 
+                    step="0.01"
+                    value={newItem.costPerUnit} 
+                    onChange={e => setNewItem({...newItem, costPerUnit: e.target.value})}
+                    className="inv-input"
+                  />
+                </div>
+              </div>
+
+              {err && <div className="inv-err-alert">{err}</div>}
+              <button className="inv-submit-btn" onClick={addGeneralInventory}>➕ Add to Inventory</button>
+            </div>
+          </div>
+
+          <div className="inv-list-card">
+            <div className="inv-list-header">
+              <div className="inv-list-title">📋 Current Inventory ({inventory.length})</div>
+              <input 
+                type="text" 
+                placeholder="Search items..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="inv-search"
+              />
+            </div>
+
+            {inventory.length === 0 ? (
+              <div className="empty-state"><p>No inventory items yet. Add one above!</p></div>
+            ) : filteredInventory.length === 0 ? (
+              <div className="empty-state"><p>No items match your search.</p></div>
+            ) : (
+              <div className="inv-items-container">
+                {filteredInventory.map((item, idx) => (
+                  <div key={item.id} className="inv-item-card">
+                    <div className="inv-item-header">
+                      <div className="inv-item-number">{idx + 1}</div>
+                      <div className="inv-item-info">
+                        <div className="inv-item-name">{item.name}</div>
+                        <div className="inv-item-meta">{item.category} • {item.unit}</div>
+                      </div>
+                      <button className="inv-del-btn" onClick={() => deleteInventoryItem(item.id)}>✕</button>
+                    </div>
+
+                    <div className="inv-item-details">
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Quantity:</span>
+                        <div className="inv-qty-editor">
+                          <input 
+                            type="number" 
+                            value={item.quantity} 
+                            onChange={e => updateItemQuantity(item.id, e.target.value)}
+                            className="inv-qty-input"
+                            step="0.01"
+                          />
+                          <span className="inv-unit">{item.unit}</span>
+                        </div>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Unit Cost:</span>
+                        <span className="inv-detail-value">{fmt(item.costPerUnit)}</span>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Total Value:</span>
+                        <span className="inv-detail-value highlight">{fmt(item.quantity * item.costPerUnit)}</span>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Added:</span>
+                        <span className="inv-detail-value">{item.createdDate || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Beverages Tab */}
+      {tab === 'beverages' && (
+        <div className="inv-split-layout">
+          <div className="inv-form-card">
+            <div className="inv-form-title">🍹 Add New Beverage</div>
+            <div className="inv-form-content">
+              <div className="inv-field-group">
+                <label>Beverage Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g., Mango Lassi, Lemonade" 
+                  value={newBev.name} 
+                  onChange={e => setNewBev({...newBev, name: e.target.value})}
+                  className="inv-input"
+                />
+              </div>
+
+              <div className="inv-field-row">
+                <div className="inv-field-group">
+                  <label>Unit *</label>
+                  <select value={newBev.unit} onChange={e => setNewBev({...newBev, unit: e.target.value})} className="inv-input">
+                    <option>Glass</option>
+                    <option>Cup</option>
+                    <option>Bottle</option>
+                    <option>Liter</option>
+                  </select>
+                </div>
+                <div className="inv-field-group">
+                  <label>Reorder Level *</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g., 20" 
+                    min="0"
+                    value={newBev.reorderLevel} 
+                    onChange={e => setNewBev({...newBev, reorderLevel: e.target.value})}
+                    className="inv-input"
+                  />
+                </div>
+              </div>
+
+              <div className="inv-field-row">
+                <div className="inv-field-group">
+                  <label>Opening Quantity *</label>
+                  <input 
+                    type="number" 
+                    placeholder="0" 
+                    min="0"
+                    value={newBev.quantity} 
+                    onChange={e => setNewBev({...newBev, quantity: e.target.value})}
+                    className="inv-input"
+                  />
+                </div>
+                <div className="inv-field-group">
+                  <label>Cost per Unit (PKR) *</label>
+                  <input 
+                    type="number" 
+                    placeholder="0" 
+                    min="0"
+                    step="0.01"
+                    value={newBev.costPerUnit} 
+                    onChange={e => setNewBev({...newBev, costPerUnit: e.target.value})}
+                    className="inv-input"
+                  />
+                </div>
+              </div>
+
+              {err && <div className="inv-err-alert">{err}</div>}
+              <button className="inv-submit-btn inv-submit-orange" onClick={addBeverageInventory}>🍹 Add Beverage</button>
+            </div>
+          </div>
+
+          <div className="inv-list-card">
+            <div className="inv-list-header">
+              <div className="inv-list-title">🍹 Beverages ({beverages.length})</div>
+              <input 
+                type="text" 
+                placeholder="Search beverages..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="inv-search"
+              />
+            </div>
+
+            {beverages.length === 0 ? (
+              <div className="empty-state"><p>No beverages added yet.</p></div>
+            ) : filteredBeverages.length === 0 ? (
+              <div className="empty-state"><p>No beverages match your search.</p></div>
+            ) : (
+              <div className="inv-items-container">
+                {filteredBeverages.map((bev, idx) => (
+                  <div key={bev.id} className={`inv-item-card ${bev.quantity <= bev.reorderLevel ? 'low-stock' : ''}`}>
+                    <div className="inv-item-header">
+                      <div className="inv-item-number">🍹</div>
+                      <div className="inv-item-info">
+                        <div className="inv-item-name">{bev.name}</div>
+                        <div className="inv-item-meta">{bev.unit}</div>
+                      </div>
+                      <button className="inv-del-btn" onClick={() => deleteBeverageItem(bev.id)}>✕</button>
+                    </div>
+
+                    <div className="inv-item-details">
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Current Stock:</span>
+                        <div className="inv-qty-editor">
+                          <input 
+                            type="number" 
+                            value={bev.quantity} 
+                            onChange={e => updateBevQuantity(bev.id, e.target.value)}
+                            className="inv-qty-input"
+                            min="0"
+                          />
+                          <span className="inv-unit">{bev.unit}s</span>
+                        </div>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Reorder Level:</span>
+                        <span className={`inv-detail-value ${bev.quantity <= bev.reorderLevel ? 'warning' : ''}`}>{bev.reorderLevel} {bev.unit}s</span>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Unit Cost:</span>
+                        <span className="inv-detail-value">{fmt(bev.costPerUnit)}</span>
+                      </div>
+                      <div className="inv-detail-row">
+                        <span className="inv-detail-label">Total Value:</span>
+                        <span className="inv-detail-value highlight">{fmt(bev.quantity * bev.costPerUnit)}</span>
+                      </div>
+                    </div>
+
+                    {bev.quantity <= bev.reorderLevel && (
+                      <div className="inv-stock-warning">⚠️ Low Stock - Reorder Soon!</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

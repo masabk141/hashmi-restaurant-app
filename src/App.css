@@ -210,30 +210,57 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   min-height:100vh; display:flex; background:var(--white);
 }
 .login-left {
-  flex:1; background:var(--sidebar-bg);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:48px; text-align:center;
+  flex:1; position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
 }
-.login-logo-img { width:160px; object-fit:contain; margin-bottom:24px; filter:drop-shadow(0 4px 16px rgba(0,0,0,0.4)); }
-.login-tagline { font-size:20px; font-weight:700; color:#ffffff; margin-bottom:8px; }
-.login-tagline-sub { font-size:13px; color:rgba(255,255,255,0.45); line-height:1.7; }
+.login-video {
+  width:100%; height:100%; object-fit:cover; position:absolute;
+  top:0; left:0; z-index:1;
+}
+.login-overlay {
+  position:absolute; inset:0; background:rgba(17,24,39,0.4);
+  z-index:2;
+}
 .login-right {
   width:420px; display:flex; align-items:center; justify-content:center;
-  padding:48px 40px; background:var(--bg);
+  padding:48px 40px; background:var(--white); z-index:3;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.15);
 }
 .login-card { width:100%; }
-.lc-title { font-size:22px; font-weight:700; color:var(--text); margin-bottom:4px; }
-.lc-sub   { font-size:13px; color:var(--text3); margin-bottom:24px; }
+.login-header-logo {
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:24px; padding-bottom:20px;
+  border-bottom:2px solid var(--border);
+}
+.login-logo-lg {
+  width:120px; height:120px; object-fit:contain;
+  border-radius:12px; background:#f3f4f6; flex-shrink:0;
+  padding:8px; filter:drop-shadow(0 4px 12px rgba(200,16,46,0.15));
+  transition:transform 0.3s ease;
+}
+.login-logo-lg:hover {
+  transform:scale(1.05);
+}
+.login-form-title { 
+  font-size:22px; font-weight:700; color:var(--text); 
+  text-align:center; margin-bottom:6px;
+}
+.login-form-sub { 
+  font-size:13px; color:var(--text3); text-align:center;
+  margin-bottom:24px;
+}
+.lc-title { font-size:20px; font-weight:700; color:var(--text); }
+.lc-sub   { font-size:12px; color:var(--text3); margin-top:2px; }
 .pass-wrap { position:relative; }
 .pass-wrap input { width:100%; padding-right:60px; }
 .show-btn { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; }
 .login-btn {
   width:100%; background:var(--accent); color:white; font-size:14px; font-weight:600;
   padding:11px; border-radius:var(--radius-sm); border:none; cursor:pointer;
-  font-family:'Inter',sans-serif; margin-bottom:16px; transition:background 0.2s;
+  font-family:'Inter',sans-serif; margin-top:16px; transition:background 0.2s;
 }
 .login-btn:hover { background:var(--accent-dark); }
-.login-hint { background:#f9fafb; border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-size:11px; color:var(--text3); line-height:1.9; }
+.login-hint { display:none; }
 
 /* ══════════════════════════════════════════════
    DASHBOARD
@@ -669,11 +696,16 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 
   /* Login page */
   .login-page { flex-direction: column; }
-  .login-left { padding: 24px; display: none; }
-  .login-right { width: 100%; padding: 20px; background: var(--bg); }
+  .login-left { width: 100%; height: 200px; position: relative; }
+  .login-video { width: 100%; height: 100%; object-fit: cover; }
+  .login-overlay { inset: 0; }
+  .login-right { width: 100%; padding: 20px; background: var(--white); box-shadow: none; border-top: 1px solid var(--border); }
   .login-card { width: 100%; }
-  .lc-title { font-size: 18px; }
-  .login-btn { padding: 10px; font-size: 13px; }
+  .login-header-logo { margin-bottom: 18px; padding-bottom: 14px; }
+  .login-logo-lg { width: 90px; height: 90px; }
+  .login-form-title { font-size: 18px; }
+  .login-form-sub { font-size: 12px; margin-bottom: 18px; }
+  .login-btn { padding: 10px; font-size: 13px; margin-top: 12px; }
   .show-btn { font-size: 11px; right: 8px; }
 
   /* Beverage rows */
@@ -736,9 +768,13 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   .staff-row, .device-row { padding: 8px 12px; }
   .staff-av { width: 30px; height: 30px; font-size: 12px; }
 
+  .login-page { flex-direction: column; }
+  .login-left { height: 180px; }
   .login-right { padding: 16px; }
-  .lc-title { font-size: 16px; }
-  .login-hint { font-size: 10px; }
+  .login-header-logo { margin-bottom: 16px; padding-bottom: 12px; }
+  .login-logo-lg { width: 80px; height: 80px; }
+  .login-form-title { font-size: 16px; margin-bottom: 4px; }
+  .login-form-sub { font-size: 11px; margin-bottom: 16px; }
 }
 
 /* ══════════════════════════════════════════════
