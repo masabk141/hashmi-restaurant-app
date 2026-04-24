@@ -86,13 +86,14 @@ const SEED_TRANSACTIONS = [
 ];
 
 const NAV_ITEMS = [
-  { id:'dashboard', label:'Dashboard',              icon:'▦' },
-  { id:'expenses',  label:'Restaurant Expenses',    icon:'↑' },
-  { id:'customers', label:'Customer Transactions',  icon:'↓' },
-  { id:'beverages', label:'Beverage Management',    icon:'🍹' },
-  { id:'history',   label:'Full History',           icon:'☰' },
-  { id:'reports',   label:'Reports',                icon:'◈' },
-  { id:'ledger',    label:'General Ledger',         icon:'📖' },
+  { id:'dashboard', label:'Dashboard',                    icon:'▦' },
+  { id:'customers', label:'Customer Transactions',         icon:'👥' },
+  { id:'expenses',  label:'Restaurant Expenses',           icon:'💸' },
+  { id:'inventory', label:'Inventory Management System',  icon:'📦' },
+  { id:'history',   label:'Full History',                  icon:'📜' },
+  { id:'reports',   label:'Reports',                       icon:'📊' },
+  { id:'ledger',    label:'General Ledger',                icon:'📖' },
+  { id:'settings',  label:'Settings',                      icon:'⚙' },
 ];
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -159,7 +160,6 @@ export default function App() {
   const [page,         setPage]         = useState('dashboard');
   const [toast,        setToast]        = useState({msg:'',ok:true,show:false});
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [showInventoryForm, setShowInventoryForm] = useState(false);
 
   useEffect(()=>{ saveLS('hm_txns_v3',  transactions); },[transactions]);
   useEffect(()=>{ saveLS('hm_gl_v3',    glEntries);    },[glEntries]);
@@ -236,30 +236,14 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="snav-label">MAIN MENU</div>
-          {allNavItems.slice(0,3).map(n=>(
+          <div className="snav-label">NAVIGATION</div>
+          {allNavItems.map(n=>(
             <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>{setPage(n.id); setShowMobileMenu(false);}}>
               <span className="snav-icon">{n.icon}</span>
               <span className="snav-label-text">{n.label}</span>
               {page===n.id && <span className="snav-active-bar"/>}
             </button>
           ))}
-          <div className="snav-label" style={{marginTop:20}}>RECORDS</div>
-          {allNavItems.slice(3,7).map(n=>(
-            <button key={n.id} className={`snav-item ${page===n.id?'active':''}`} onClick={()=>{setPage(n.id); setShowMobileMenu(false);}}>
-              <span className="snav-icon">{n.icon}</span>
-              <span className="snav-label-text">{n.label}</span>
-              {page===n.id && <span className="snav-active-bar"/>}
-            </button>
-          ))}
-          {isOwner && <>
-            <div className="snav-label" style={{marginTop:20}}>ADMIN</div>
-            <button className={`snav-item ${page==='settings'?'active':''}`} onClick={()=>{setPage('settings'); setShowMobileMenu(false);}} >
-              <span className="snav-icon">⚙</span>
-              <span className="snav-label-text">Settings</span>
-              {page==='settings' && <span className="snav-active-bar"/>}
-            </button>
-          </>}
         </nav>
 
         <div className="sidebar-footer">
@@ -415,25 +399,18 @@ function DashboardPage({ transactions, glEntries, beverages, inventory, setInven
   const paidCount  = transactions.filter(t=>t.status==='Paid').length;
   const totalCount = transactions.length;
   
-  // Beverage Stats
-  const beverageInventoryValue = beverages.reduce((s,b)=>s+(b.quantity*b.costPerUnit),0);
-  const lowStockBeverages = beverages.filter(b=>b.quantity <= b.reorderLevel).length;
-  
   const catMap={};
   expTx.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const topCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const recentUnpaid = transactions.filter(t=>t.status==='Unpaid').slice(0,4);
 
-  // Total Liabilities
+  // Total Liabilities (including unpaid balances per accounting standards)
+  // Unpaid expenses are liabilities (Accounts Payable) - they represent money owed
   const liabilityCodes = Object.keys(CHART_OF_ACCOUNTS).filter(code => CHART_OF_ACCOUNTS[code].type === 'Liability');
-  let totalLiabilities = 0;
+  let totalLiabilities = totalUnpaid; // Start with unpaid balances as liabilities
   glEntries.forEach(entry => {
     if (liabilityCodes.includes(entry.creditCode)) totalLiabilities += entry.amount;
     if (liabilityCodes.includes(entry.debitCode)) totalLiabilities -= entry.amount;
   });
-
-  // Total Inventory Value
-  const inventoryValue = inventory.reduce((s, item) => s + (item.quantity * item.costPerUnit), 0) + beverageInventoryValue;
 
   return (
     <div className="page-wrap">
@@ -449,10 +426,8 @@ function DashboardPage({ transactions, glEntries, beverages, inventory, setInven
       <div className="kpi-row">
         <KpiCard label="Total Revenue" value={fmt(totalCus)}    delta={`${cusTx.length} entries`}   color="green"  icon={<IconRevenue/>}/>
         <KpiCard label="Total Expenses" value={fmt(totalExp)}   delta={`${expTx.length} entries`}   color="red"    icon={<IconExpense/>}/>
-        <KpiCard label="Unpaid Balance" value={fmt(totalUnpaid)} delta={`${unpaidCount} pending`}   color="yellow" icon={<IconPending/>}/>
         <KpiCard label="Net Profit" value={fmt(net)}             delta={net>=0?'Profit':'Loss'}      color={net>=0?'green':'red'} icon={<IconNet/>}/>
-        <KpiCard label="Total Inventory" value={fmt(inventoryValue)} delta={`${inventory.length + beverages.length} items`} color="orange" icon={<IconBeverage/>}/>
-        <KpiCard label="Total Liabilities" value={fmt(totalLiabilities)} delta={`Liability accounts`} color="purple" icon={<IconLedger/>}/>
+        <KpiCard label="Total Liabilities" value={fmt(totalLiabilities)} delta={`Including unpaid + GL`} color="purple" icon={<IconLedger/>}/>
       </div>
 
       {/* Quick Actions - MOVED UP */}
@@ -466,32 +441,32 @@ function DashboardPage({ transactions, glEntries, beverages, inventory, setInven
         </div>
       </div>
 
-      {/* Middle Row - Pending & Categories */}
+      {/* Middle Row - Liabilities & Categories */}
       <div className="dash-mid">
-        {/* Unpaid Items */}
+        {/* Total Liabilities Card */}
         <div className="dash-card" style={{flex:1.2}}>
           <div className="dc-header">
-            <span className="dc-title">Pending Payments</span>
-            {unpaidCount>0 && <span className="dc-badge red">{unpaidCount} unpaid</span>}
+            <span className="dc-title">📋 Total Liabilities</span>
+            <span className="dc-badge purple">Accounting Standard</span>
           </div>
-          {recentUnpaid.length===0
-            ? <div className="empty-state"><span>✓</span><p>All caught up! No pending payments.</p></div>
-            : recentUnpaid.map(t=>(
-              <div className="pending-row" key={t.id}>
-                <div className="pr-left">
-                  <div className="pr-dot" style={{background: t.section==='expense'?'var(--red)':'var(--green)'}}/>
-                  <div>
-                    <div className="pr-party">{t.party}</div>
-                    <div className="pr-meta">{t.category} · {t.date}</div>
-                  </div>
-                </div>
-                <div className="pr-right">
-                  <span className="pr-amt">{fmt(t.amount)}</span>
-                  <button className="mark-paid-btn" onClick={()=>markPaid(t.id)}>✓ Paid</button>
-                </div>
-              </div>
-            ))
-          }
+          <div className="liability-summary">
+            <div className="ls-item">
+              <div className="ls-label">Accounts Payable (Unpaid)</div>
+              <div className="ls-value">{fmt(totalUnpaid)}</div>
+            </div>
+            <div className="ls-item">
+              <div className="ls-label">Other GL Liabilities</div>
+              <div className="ls-value">{fmt(totalLiabilities - totalUnpaid)}</div>
+            </div>
+            <div className="ls-divider"/>
+            <div className="ls-total">
+              <div className="lst-label">Total Liabilities</div>
+              <div className="lst-value">{fmt(totalLiabilities)}</div>
+            </div>
+          </div>
+          <div className="liability-note">
+            <span>📘</span> Per international accounting standards (GAAP/IFRS), unpaid expenses are recorded as liabilities (Accounts Payable) until paid.
+          </div>
         </div>
 
         {/* Top Categories */}
@@ -573,9 +548,7 @@ function KpiCard({ label, value, delta, color, icon }) {
 // ── ICONS ──
 const IconRevenue = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M6 6l4-4 4 4M6 14l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 const IconExpense = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 10h14M10 3v14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
-const IconPending = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 const IconNet     = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14l4-4 3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
-const IconBeverage = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 2h8v4c0 2.21-1.79 4-4 4s-4-1.79-4-4V2M4.5 6h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 6v8.5c0 1.93 1.57 3.5 3.5 3.5h1c1.93 0 3.5-1.57 3.5-3.5V6" stroke="currentColor" strokeWidth="1.5"/></svg>;
 const IconLedger = ()=><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/><path d="M4 8h12M4 12h12M8 4v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1416,6 +1389,9 @@ function BeveragesPage({ beverages, setBeverages, addTransaction, glEntries, set
 // ══════════════════════════════════════════════════════════════════════════
 function LedgerPage({ glEntries, chartOfAccounts }) {
   const [selectedAcct, setSelectedAcct] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [glForm, setGlForm] = useState({date: today(), debitCode: '', creditCode: '', amount: '', description: ''});
+  const [err, setErr] = useState('');
   
   // Calculate account balances
   function getAccountBalance(code) {
@@ -1431,13 +1407,93 @@ function LedgerPage({ glEntries, chartOfAccounts }) {
     accountGroups[acc.type].push(acc);
   });
 
+  // Get all accounts as array for dropdown
+  const allAccounts = Object.values(chartOfAccounts);
+
+  // Handle adding new GL entry
+  function handleAddGL() {
+    if (!glForm.debitCode || !glForm.creditCode || !glForm.amount || !glForm.description) {
+      setErr('All fields are required');
+      return;
+    }
+    if (glForm.debitCode === glForm.creditCode) {
+      setErr('Debit and Credit accounts must be different');
+      return;
+    }
+    const amount = parseFloat(glForm.amount);
+    if (amount <= 0) {
+      setErr('Amount must be greater than 0');
+      return;
+    }
+    
+    // This would be passed from parent - for now we'll show a success message
+    setErr('');
+    setShowAddModal(false);
+    setGlForm({date: today(), debitCode: '', creditCode: '', amount: '', description: ''});
+    alert(`GL Entry prepared:\nDate: ${glForm.date}\nDr: ${chartOfAccounts[glForm.debitCode]?.name}\nCr: ${chartOfAccounts[glForm.creditCode]?.name}\nAmount: ${fmt(amount)}\n\nNote: Connect this to parent setGlEntries to save.`);
+  }
+
   return (
     <div className="page-wrap">
-      <PageHeader title="General Ledger (Double-Entry Bookkeeping)" action={<span className="badge">{glEntries.length} Entries</span>}/>
+      <PageHeader 
+        title="📖 General Ledger (Double-Entry Bookkeeping)" 
+        action={
+          <button className="dl-btn" onClick={() => setShowAddModal(true)}>+ Add Entry</button>
+        }
+      />
+      
+      {/* Add GL Entry Modal */}
+      {showAddModal && (
+        <div className="gl-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="gl-modal" onClick={e => e.stopPropagation()}>
+            <div className="gl-modal-header">
+              <span>➕ Add General Ledger Entry</span>
+              <button className="gl-modal-close" onClick={() => setShowAddModal(false)}>✕</button>
+            </div>
+            <div className="gl-modal-body">
+              <div className="gl-field">
+                <label>Date *</label>
+                <input type="date" value={glForm.date} onChange={e => setGlForm({...glForm, date: e.target.value})} />
+              </div>
+              <div className="gl-field">
+                <label>Debit Account (Increase) *</label>
+                <select value={glForm.debitCode} onChange={e => setGlForm({...glForm, debitCode: e.target.value})}>
+                  <option value="">-- Select Debit Account --</option>
+                  {allAccounts.map(acc => (
+                    <option key={acc.code} value={acc.code}>{acc.code} - {acc.name} ({acc.type})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="gl-field">
+                <label>Credit Account (Decrease) *</label>
+                <select value={glForm.creditCode} onChange={e => setGlForm({...glForm, creditCode: e.target.value})}>
+                  <option value="">-- Select Credit Account --</option>
+                  {allAccounts.map(acc => (
+                    <option key={acc.code} value={acc.code}>{acc.code} - {acc.name} ({acc.type})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="gl-field">
+                <label>Amount (PKR) *</label>
+                <input type="number" placeholder="0" min="0" value={glForm.amount} onChange={e => setGlForm({...glForm, amount: e.target.value})} />
+              </div>
+              <div className="gl-field">
+                <label>Description *</label>
+                <input type="text" placeholder="e.g., Cash received from customer" value={glForm.description} onChange={e => setGlForm({...glForm, description: e.target.value})} />
+              </div>
+              {err && <div className="gl-err-alert">{err}</div>}
+              <div className="gl-modal-actions">
+                <button className="gl-btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button className="gl-btn-submit" onClick={handleAddGL}>+ Add Entry</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="gl-container">
         <div className="gl-accounts">
-          <div className="gl-section-title">Chart of Accounts</div>
+          <div className="gl-section-title">📋 Chart of Accounts</div>
           {Object.entries(accountGroups).map(([type,accts])=>(
             <div key={type} className="gl-type-group">
               <div className="gl-type-label">{type.toUpperCase()}S</div>
@@ -1456,7 +1512,10 @@ function LedgerPage({ glEntries, chartOfAccounts }) {
           {selectedAcct ? (
             <>
               <div className="gle-header">
-                <div>{chartOfAccounts[selectedAcct]?.code} - {chartOfAccounts[selectedAcct]?.name}</div>
+                <div>
+                  <div className="gle-acc-name">{chartOfAccounts[selectedAcct]?.name}</div>
+                  <div className="gle-acc-code">Code: {selectedAcct} • {chartOfAccounts[selectedAcct]?.type}</div>
+                </div>
                 <div className="gle-balance">Balance: {fmt(getAccountBalance(selectedAcct))}</div>
               </div>
               <div className="gle-table">
@@ -1466,7 +1525,9 @@ function LedgerPage({ glEntries, chartOfAccounts }) {
                   <div>Credit</div>
                   <div>Description</div>
                 </div>
-                {glEntries.filter(e=>e.debitCode===selectedAcct||e.creditCode===selectedAcct).map(e=>(
+                {glEntries.filter(e=>e.debitCode===selectedAcct||e.creditCode===selectedAcct).length === 0 ? (
+                  <div className="gle-empty">No entries for this account</div>
+                ) : glEntries.filter(e=>e.debitCode===selectedAcct||e.creditCode===selectedAcct).map(e=>(
                   <div className="gle-row" key={e.id}>
                     <div>{e.date}</div>
                     <div>{e.debitCode===selectedAcct?fmt(e.amount):'-'}</div>
@@ -1477,27 +1538,34 @@ function LedgerPage({ glEntries, chartOfAccounts }) {
               </div>
             </>
           ) : (
-            <div className="empty-state" style={{padding:'60px 24px'}}><p>Select an account to view entries</p></div>
+            <div className="gle-select-prompt">
+              <div className="gle-prompt-icon">📖</div>
+              <div className="gle-prompt-title">Select an Account</div>
+              <div className="gle-prompt-text">Choose an account from the left panel to view its journal entries and balance.</div>
+            </div>
           )}
         </div>
       </div>
 
       {/* Trial Balance */}
       <div className="dash-card" style={{marginTop:24}}>
-        <div className="dc-header"><span className="dc-title">Trial Balance</span></div>
+        <div className="dc-header">
+          <span className="dc-title">⚖️ Trial Balance</span>
+          <span className="dc-badge">{glEntries.length} Entries</span>
+        </div>
         <div className="trial-balance-table">
           <div className="tbl-header">
             <div>Account</div>
             <div>Code</div>
-            <div>Debit Balance</div>
-            <div>Credit Balance</div>
+            <div>Debit</div>
+            <div>Credit</div>
           </div>
           {Object.values(chartOfAccounts).map(acc=>{
             const balance = getAccountBalance(acc.code);
             const isDebitBal = ['1','3','5'].includes(acc.code[0]);
             const debitBal = balance >= 0 && isDebitBal ? balance : 0;
             const creditBal = balance >= 0 && !isDebitBal ? balance : Math.abs(balance);
-            return balance !== 0 && (
+            return (debitBal !== 0 || creditBal !== 0) && (
               <div className="tbl-row" key={acc.code}>
                 <div>{acc.name}</div>
                 <div>{acc.code}</div>
